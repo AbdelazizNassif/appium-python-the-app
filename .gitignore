@@ -1,0 +1,7 @@
+screenshot/
+.pytest_cache/
+venv/
+.idea/
+assets/
+__pycache__/
+report.html
