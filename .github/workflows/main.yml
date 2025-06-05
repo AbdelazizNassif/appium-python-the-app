@@ -10,7 +10,8 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
+    timeout-minutes: 30
 
     steps:
     - name: Checkout repository
@@ -36,8 +37,7 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       with:
-        # Optional: Specify exact command line tools version
-        cmdline-tools: 'latest'  # or '12.0' to match your preinstalled version
+        cmdline-tools: 'latest'
 
     - name: Accept licenses
       run: |
@@ -56,25 +56,39 @@ jobs:
         disable-animations: true
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         script: |
+          adb start-server
           adb devices
           adb wait-for-device
-          adb shell getprop init.svc.bootanim
-          echo "Emulator is ready"
+          until adb shell getprop sys.boot_completed | grep "1"; do
+            sleep 5
+          done
+          echo "Emulator fully booted"
 
     - name: Start Appium server
       run: |
         appium --log-level error --relaxed-security &
-        sleep 10
+        sleep 15
         adb devices
         echo "Appium server started"
         
     - name: Run tests
       run: |
-        pytest --html=report.html
+        pytest --html=report.html --self-contained-html
 
-    - name: Upload html test report as artifact
+    - name: Upload html test report
       uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-report
         path: report.html
+
+    - name: Stop Appium
+      if: always()
+      run: |
+        pkill -f "appium" || true
+
+    - name: Stop Emulator
+      if: always()
+      run: |
+        adb emu kill || true
+        adb kill-server || true
