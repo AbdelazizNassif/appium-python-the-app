@@ -30,8 +30,10 @@ jobs:
     - name: Start Appium server
       run: |
         appium --log-level error --relaxed-security &
+        sleep 10
+        adb devices
         echo "Appium server started"
-        
+           
     - name: Setup Java
       uses: actions/setup-java@v3
       with:
@@ -57,8 +59,14 @@ jobs:
       with:
         api-level: 33
         arch: x86_64
-        profile: Pixel XL
-        script: echo "Emulator started"
+        profile: Nexus 6
+        disable-animations: true
+        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        script: |
+          adb devices
+          adb wait-for-device
+          adb shell getprop init.svc.bootanim
+          echo "Emulator is ready"
       
     - name: Run tests
       run: |
