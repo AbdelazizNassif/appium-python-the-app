@@ -35,11 +35,22 @@ jobs:
     - name: Setup Java
       uses: actions/setup-java@v3
       with:
-        distribution: 'zulu'
-        java-version: '11'
+        distribution: 'temurin'
+        java-version: '17'
         
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
+      with:
+        # Optional: Specify exact command line tools version
+        cmdline-tools: 'latest'  # or '12.0' to match your preinstalled version
+
+    - name: Accept licenses
+      run: |
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+        
+    - name: Install Android packages
+      run: |
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" "emulator" "system-images;android-33;google_apis;x86_64"
       
     - name: Start Android Emulator
       uses: reactivecircus/android-emulator-runner@v2
@@ -53,7 +64,7 @@ jobs:
       run: |
         pytest --html=report.html
 
-    - name: Upload Allure report as artifact
+    - name: Upload html test report as artifact
       uses: actions/upload-artifact@v4
       if: always()
       with:
