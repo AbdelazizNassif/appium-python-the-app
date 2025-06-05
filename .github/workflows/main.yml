@@ -52,9 +52,9 @@ jobs:
     - name: Run tests
       run: |
         python -m pytest tests/ --html=report.html
-        
-    - name: Upload test report
-      uses: actions/upload-artifact@v3
+
+    - name: Upload Allure report as artifact
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-report
