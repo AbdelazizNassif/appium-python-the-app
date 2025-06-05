@@ -52,25 +52,61 @@ jobs:
       run: |
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3" "emulator" "system-images;android-30;google_apis;x86_64"
       
-    - name: Create AVD
+    - name: Create and Verify AVD
       run: |
+        # Delete existing AVD if present
+        $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager delete avd -n test || true
+        
+        # Create new AVD
         echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" -d "pixel"
+        
+        # Verify AVD creation
+        $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager list avd
 
-    - name: Start Emulator with Port Specification
+    - name: Start Emulator with Detailed Logging
       run: |
-        $ANDROID_HOME/emulator/emulator -avd test -no-window -noaudio -no-boot-anim -ports 5554,5555 &
-        echo "Emulator started on port 5554"
+        # Free up port 5554
+        lsof -ti :5554 | xargs kill -9 || true
+        
+        # Start emulator with verbose logging
+        $ANDROID_HOME/emulator/emulator -avd test -no-window -noaudio -no-boot-anim -ports 5554,5555 -verbose > emulator.log 2>&1 &
+        echo "Emulator started in background"
+        
+        # Tail logs for debugging
+        tail -f emulator.log &
+        TAIL_PID=$!
+        
+        # Wait for emulator to start
+        sleep 30
+        kill $TAIL_PID
 
-    - name: Verify Emulator Connection
+    - name: Wait for Device Connection
+      run: |
+        # Reset ADB connection
+        adb kill-server
+        adb start-server
+        
+        # Wait for device with timeout
+        timeout 300 bash -c 'until adb devices | grep -q "emulator-5554"; do sleep 5; echo "Waiting for emulator..."; done'
+        
+        # Verify device state
+        adb -s emulator-5554 wait-for-device
+        adb -s emulator-5554 shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 5; done;'
+        
+        # Additional verification
+        adb -s emulator-5554 shell input keyevent 82
+        echo "Emulator is fully ready"
+
+    - name: Verify Emulator Functionality
       run: |
         adb devices
-        adb shell pm list packages
-        echo "Emulator verification complete"
+        adb -s emulator-5555 shell pm list packages
+        echo "Emulator verification successful"
 
     - name: Start Appium server
       run: |
         appium --log-level error --relaxed-security &
-        sleep 10
+        sleep 15
         echo "Appium server started"
         
     - name: Run tests
@@ -82,12 +118,14 @@ jobs:
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         pytest --html=report.html --self-contained-html
 
-    - name: Upload test report
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-report
-        path: report.html
+        name: test-artifacts
+        path: |
+          report.html
+          emulator.log
 
     - name: Cleanup
       if: always()
@@ -95,4 +133,4 @@ jobs:
         adb -s emulator-5554 emu kill || true
         adb kill-server || true
         pkill -f "appium" || true
-        pkill -f "emulator" || true
+       
