@@ -56,14 +56,20 @@ jobs:
 
     - name: Start Emulator
       run: |
+        echo "Starting emulator..."
         nohup emulator -avd test -no-snapshot-save -noaudio -no-window -gpu swiftshader_indirect > emulator.log 2>&1 &
+        
         brew install coreutils
         gtimeout 300 bash -c 'until adb devices | grep -q emulator; do echo "Waiting for emulator..."; sleep 5; done'
+        
+        echo "Waiting for system to boot..."
         adb wait-for-device
+        adb shell 'while [[ $(getprop sys.boot_completed) != "1" ]]; do echo "Waiting for full boot..."; sleep 5; done'
+        
+        echo "Disabling animations..."
         adb shell settings put global window_animation_scale 0
         adb shell settings put global transition_animation_scale 0
         adb shell settings put global animator_duration_scale 0
-        adb shell input keyevent 82
 
     - name: Start Appium Server
       run: |
