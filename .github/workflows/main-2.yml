@@ -1,5 +1,4 @@
-
-name: Java CI with Maven
+name: Appium Android Tests
 
 on:
   workflow_dispatch:
@@ -10,16 +9,19 @@ on:
         default: 'Run appium tests'
 
 jobs:
-  build:
+  test:
     runs-on: macos-latest
-    strategy:
-      matrix:
-        api-level: [30]  
-        target: [default]
+    timeout-minutes: 30
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -30,27 +32,82 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         npm install -g appium
-
-    - uses: actions/checkout@v2
-    - name: Set up JDK 1.8
-      uses: actions/setup-java@v1
+           
+    - name: Setup Java
+      uses: actions/setup-java@v3
       with:
-        java-version: 1.8
-
-    - uses: actions/setup-node@v2
+        distribution: 'temurin'
+        java-version: '17'
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
       with:
-       node-version: '20'
-    - run: |
-            npm install -g appium@v1.20.2
-            appium -v
-            appium &>/dev/null &
+        cmdline-tools: 'latest'
 
-    - name: Run Appium Tests
-      uses: reactivecircus/android-emulator-runner@v1
-      with:
+    - name: Accept licenses
+      run: |
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+        
+    - name: Install Android packages
+      run: |
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3" "emulator" "system-images;android-30;google_apis;x86_64"
+      
+    - name: Create AVD
+      run: |
+        echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n test -k "system-images;android-30;google_apis;x86_64" -d "pixel"
+
+    - name: Start Emulator with Port Specification
+      run: |
+        $ANDROID_HOME/emulator/emulator -avd test -no-window -noaudio -no-boot-anim -ports 5554,5555 &
+        echo "Emulator started on port 5554"
+        
+    - name: Wait for Emulator
+      run: |
+        # Wait for device to be recognized
+        adb wait-for-device
+        
+        # Wait for emulator to fully boot
+        while ! adb shell getprop sys.boot_completed 2>/dev/null | grep -q "1"; do
+          sleep 5
+          echo "Waiting for emulator to boot..."
+        done
+        
+        # Additional verification
+        adb shell input keyevent 82  # Wake up device
+        echo "Emulator is ready"
+
+    - name: Verify Emulator Connection
+      run: |
+        adb devices
+        adb shell pm list packages
+        echo "Emulator verification complete"
+
+    - name: Start Appium server
+      run: |
+        appium --log-level error --relaxed-security &
+        sleep 10
+        echo "Appium server started"
+        
+    - name: Run tests
+      run: |
         api-level: 33
         arch: x86_64
         profile: Pixel XL
         disable-animations: true
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-        script: pytest --html=report.html --self-contained-html
+        pytest --html=report.html --self-contained-html
+
+    - name: Upload test report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-report
+        path: report.html
+
+    - name: Cleanup
+      if: always()
+      run: |
+        adb -s emulator-5554 emu kill || true
+        adb kill-server || true
+        pkill -f "appium" || true
+        pkill -f "emulator" || true
