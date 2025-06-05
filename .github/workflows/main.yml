@@ -26,13 +26,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         npm install -g appium
-        
-    - name: Start Appium server
-      run: |
-        appium --log-level error --relaxed-security &
-        sleep 10
-        adb devices
-        echo "Appium server started"
            
     - name: Setup Java
       uses: actions/setup-java@v3
@@ -59,7 +52,7 @@ jobs:
       with:
         api-level: 33
         arch: x86_64
-        profile: Nexus 6
+        profile: Pixel XL
         disable-animations: true
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         script: |
@@ -67,7 +60,14 @@ jobs:
           adb wait-for-device
           adb shell getprop init.svc.bootanim
           echo "Emulator is ready"
-      
+
+    - name: Start Appium server
+      run: |
+        appium --log-level error --relaxed-security &
+        sleep 10
+        adb devices
+        echo "Appium server started"
+        
     - name: Run tests
       run: |
         pytest --html=report.html
