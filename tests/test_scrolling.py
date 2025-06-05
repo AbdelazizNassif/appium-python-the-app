@@ -1,5 +1,4 @@
 from pages.the_app_splash import TheAppSplash
-from pages.picker_page import PicekrPage
 from pages.android_popups import AndroidPopups
 from pages.verify_phone import VerifyPhone
 

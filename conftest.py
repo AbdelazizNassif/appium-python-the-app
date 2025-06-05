@@ -6,8 +6,8 @@ from appium.options.android import UiAutomator2Options
 
 
 # todo: pipeline or run on device farm
-#   - to get activity > adb shell dumpsys window | find "mCurrentFocus"
-#   - start server > appium -p 4723
+#  to get activity > adb shell dumpsys window | find "mCurrentFocus"
+#  run tests:  pytest --html=report.html
 @pytest.fixture(scope="class")
 def driver(request):
     options = UiAutomator2Options()
@@ -15,11 +15,6 @@ def driver(request):
     options.device_name = "Pixel XL"
     options.automation_name = "UiAutomator2"
     options.platform_version = "13"
-    # options.app_activity = "com.android.settings.Settings"
-    # options.app_package = "com.android.settings"
-    # /}
-    # options.app_activity = "com.google.android.apps.nexuslauncher.NexusLauncherActivity"
-    # options.app_package = "com.google.android.apps.nexuslauncher"
     options.app_activity = "com.appiumpro.the_app.MainActivity"
     options.app_package = "com.appiumpro.the_app"
     driver = webdriver.Remote("http://localhost:4723", options=options)
