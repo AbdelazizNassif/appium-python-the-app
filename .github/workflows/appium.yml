@@ -27,24 +27,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Java
+   # Set up JDK
+      - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          distribution: 'adopt'
-          java-version: '11'
-
-      - name: Install dependencies
+          java-version: '17'
+          distribution: 'temurin'
+    
+    # Set up Android SDK
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+    
+    # Install emulator and create AVD
+      - name: Install emulator
         run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip wget openjdk-11-jdk
-
-      - name: Download and set up Android SDK
+          echo "y" | $ANDROID_HOME/tools/bin/sdkmanager "platform-tools" "platforms;android-34" "emulator"
+          echo "y" | $ANDROID_HOME/tools/bin/sdkmanager "system-images;android-34;google_apis;x86_64"
+          echo "no" | $ANDROID_HOME/tools/bin/avdmanager create avd -n test -k "system-images;android-34;google_apis;x86_64" -d "pixel_4" --force
+    
+    # Start emulator in background
+      - name: Start emulator
         run: |
-          wget https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O cmdline-tools.zip
-          mkdir -p $ANDROID_HOME/cmdline-tools
-          unzip cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools
-          yes | $ANDROID_HOME/cmdline-tools/tools/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses
-          $ANDROID_HOME/cmdline-tools/tools/bin/sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-33" "build-tools;33.0.0"
+          $ANDROID_HOME/emulator/emulator -avd test -noaudio -no-window -no-snapshot -no-boot-anim -gpu swiftshader_indirect &
+          $ANDROID_HOME/platform-tools/adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done; input keyevent 82'
 
       - name: Start Appium server
         run: |
