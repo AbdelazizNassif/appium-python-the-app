@@ -1,61 +1,61 @@
-name: Run Appium Tests on Android Emulator
+name: Appium Tests
 
 on:
-  workflow_dispatch:
-    inputs:
-      deploy_message:
-        description: 'Deployment message'
-        required: true
-        default: 'Run Appium tests'
-        
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
 jobs:
-  appium-tests:
-    runs-on: macos-latest
+  appium:
+    runs-on: ubuntu-latest
+
+    services:
+      adb:
+        image: budtmo/docker-android-x86-11.0
+        ports:
+          - 5555:5555
+        options: --privileged
+
+    env:
+      ANDROID_HOME: /usr/local/android-sdk
+      PATH: $PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up JDK 
-        uses: actions/setup-java@v1
+      - name: Set up Java
+        uses: actions/setup-java@v3
         with:
-          java-version: 17
+          distribution: 'adopt'
+          java-version: '11'
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          sudo apt-get update
+          sudo apt-get install -y unzip wget openjdk-11-jdk
 
-      - name: Set up Android SDK & Emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 30
-          target: google_apis
-          arch: x86_64
-          profile: pixel_4
-          disable-animations: true
-          script: echo "Android emulator is ready."
+      - name: Download and set up Android SDK
+        run: |
+          wget https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O cmdline-tools.zip
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          unzip cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools
+          yes | $ANDROID_HOME/cmdline-tools/tools/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses
+          $ANDROID_HOME/cmdline-tools/tools/bin/sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-33" "build-tools;33.0.0"
 
-      - name: Install Node.js (required for Appium)
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - name: Install Appium
+      - name: Start Appium server
         run: |
           npm install -g appium
-          appium -v
+          appium &
 
-      - name: Start Appium server in background
+      - name: Run Appium tests
+        env:
+          APPIUM_SERVER_URL: http://localhost:4723
         run: |
-          nohup appium > appium.log 2>&1 &
-          sleep 10
-
-      - name: Run Appium Tests
-        run: |
-           pytest --html=report.html --self-contained-html
+          # Replace with your test command, e.g., for pytest or npm test
+          # For example, if using Python:
+          pip install -r requirements.txt
+          pytest --html=report.html --self-contained-html
